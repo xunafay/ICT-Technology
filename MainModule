@@ -1,0 +1,111 @@
+MODULE MainModule
+	CONST robtarget startPos:=[[378.22,-64.84,103.93],[0.000155952,1,0.000207079,-0.00039833],[-1,-1,0,1],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST num offset_x := 70;
+    CONST num offset_y := 65;
+    
+    PERS num blockColor{4,3}:=[[4,4,0], [4,0,4], [0,4,0], [4,0,4]];
+    PERS num blockHeight{4,3}:=[[50,50,0], [50,0,50], [0,54,0], [54,0,54]];
+    PERS num blockExists{4,3}:=[[1,1,0], [1,0,1], [0,1,0], [1,0,1]];
+    VAR string color;
+    
+    ! 378 -64 103
+    ! 449 -0.6
+    
+	PROC main()
+		waitOnSetup;
+        startProgram;
+        FOR x FROM 1 TO 4 DO
+            FOR y FROM 1 TO 3 DO
+                grab x, y;
+                color := NumToStr(blockColor{x, y}, 0);
+                TPWrite "color: " + color;
+            ENDFOR
+        ENDFOR
+	ENDPROC
+    
+    PROC waitOnSetup()
+        TPWrite "Setup blocks and enable switch to continue";
+        WaitUntil(DI10_9_SW0 = 1);
+    ENDPROC
+    
+    PROC startProgram()
+        TPWrite "Enable second switch to start program";
+        WaitUntil(DI10_10_SW1 = 1);
+        MoveJ startPos, v100, z50, t_zuignap;
+    ENDPROC
+    
+    PROC grab(num x, num y)
+        ! Move above block
+        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), v100, z50, t_zuignap;
+        
+        ! Move down
+        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, -9.5), v100, z50, t_zuignap;
+        
+        ! Attempt to grab
+        SetDO DO_Ventiel_Vacuüm,1;
+        WaitTime 2;
+        
+        ! If no suction
+        IF DI_ManoMeter_Out1 = 0 THEN
+            blockHeight{x,y} := 50;
+            
+            ! turn off suction move down and attempt grab again
+            SetDO DO_Ventiel_Vacuüm,0;
+            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, -13.5), v100, z50, t_zuignap;
+            SetDO DO_Ventiel_Vacuüm,1;
+            WaitTime 2;
+        ELSE
+            ! grabbed succesfully
+            blockHeight{x,y} := 54;           
+        ENDIF
+        
+        IF DI_ManoMeter_Out1 = 1 THEN
+            blockExists{x,y} := 1;
+            
+            ! move up to clear other blocks
+            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 70), v100, z50, t_zuignap;
+            
+            measure_color x, y;
+            
+            ! move block back to original position in the grid
+            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 60), v100, z50, t_zuignap;
+            
+            ! move down
+            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, -9.5), v100, z50, t_zuignap;
+            ! wait for movement to stop
+            WaitTime 2;
+            
+            ! turn off suction
+            SetDO DO_Ventiel_Vacuüm,0;
+            
+        ELSE
+            ! no block grabbed
+            blockHeight{x,y} := 0;
+            blockExists{x,y} := 0;
+        ENDIF
+        
+        ! move back up
+        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), v100, z50, t_zuignap;
+    ENDPROC
+    
+    PROC measure_color(num x, num y)
+        ! move to sensor
+        MoveJ Offs(r_Kleurmeetpunt, 0, -70, 0), v100, z50, t_zuignap;
+        WaitTime 3;
+        
+        ! read color sensor
+        IF DI_Kleur_Sensor_Q1 = 1 THEN
+            blockColor{x,y} := 1;
+            TPWrite "Rood"; ! Rood
+        ELSEIF DI_Kleur_Sensor_Q2 = 1 THEN
+            blockColor{x,y} := 2;
+            TPWrite "Grijs"; ! Grijs
+        ELSEIF DI_Kleur_Sensor_Q3 = 1 THEN
+            blockColor{x,y} := 3;
+            TPWrite "Blauw"; ! Blauw
+        ELSE
+            blockColor{x,y} := 4;
+            TPWrite "Zwart"; ! 
+        ENDIF
+    ENDPROC
+ENDMODULE
