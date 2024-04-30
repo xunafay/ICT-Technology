@@ -3,25 +3,105 @@ MODULE MainModule
     CONST num offset_x := 70;
     CONST num offset_y := 65;
     
+    CONST num offset_z_high := -10;
+    CONST num offset_z_low := -14;
+    
     PERS num blockColor{4,3}:=[[4,4,0], [4,0,4], [0,4,0], [4,0,4]];
-    PERS num blockHeight{4,3}:=[[50,50,0], [50,0,50], [0,54,0], [54,0,54]];
+    PERS num blockHeight{4,3}:=[[50,54,0], [50,0,50], [0,54,0], [54,0,54]];
     PERS num blockExists{4,3}:=[[1,1,0], [1,0,1], [0,1,0], [1,0,1]];
+    
+    PERS num validated := 7;
+    PERS num rejected := 5;
+    
+    PERS num grayCount := 0;
+    PERS num blueCount := 0;
+    
+    PERS num largeCount := 4;
+    PERS num smallCount := 3;
+    
+    
     VAR string color;
+    CONST speeddata speed := v200;
+    CONST speeddata fineSpeed := v50;
     
     ! 378 -64 103
     ! 449 -0.6
     
 	PROC main()
+        reset_variables;
 		waitOnSetup;
         startProgram;
         FOR x FROM 1 TO 4 DO
             FOR y FROM 1 TO 3 DO
                 grab x, y;
-                color := NumToStr(blockColor{x, y}, 0);
-                TPWrite "color: " + color;
             ENDFOR
         ENDFOR
+        validate;
 	ENDPROC
+    
+    PROC reset_variables()
+        grayCount := 0;
+        blueCount := 0;
+        
+        validated := 0;
+        rejected := 0;
+        
+        smallCount := 0;
+        largeCount := 0;
+        
+        blockColor := [[0,0,0], [0,0,0], [0,0,0], [0,0,0]];
+        blockHeight := [[0,0,0], [0,0,0], [0,0,0], [0,0,0]];
+        blockExists := [[0,0,0], [0,0,0], [0,0,0], [0,0,0]];
+    ENDPROC
+    
+    PROC validate()
+        FOR x FROM 1 TO 4 DO
+            FOR y FROM 1 TO 3 DO
+                IF blockColor{x, y} = 3 OR blockColor{x, y} = 2 OR true THEN
+                    IF blockHeight{x,y} >= 50 THEN
+                        validated := validated + 1;
+                        color := "";
+                        colorMap blockColor{x, y}, color;
+                        TPWrite "valid block with height: " + NumToStr(blockHeight{x,y}, 0) + " and color " + color;
+                        
+                        IF blockHeight{x,y} = 50 THEN
+                            smallCount := smallCount + 1;
+                        ELSE
+                            largeCount:= largeCount + 1;
+                        ENDIF
+                    ELSE
+                        rejected := rejected + 1;
+                        TPWrite "Block height out of spec";
+                    ENDIF
+                    
+                    IF blockColor{x, y} = 2 THEN
+                        grayCount := grayCount + 1;
+                    ELSEIF blockColor{x, y} = 2 THEN
+                        blueCount := blueCount + 1;
+                    ENDIF
+                ELSE
+                    color := "";
+                    colorMap blockColor{x, y}, color;
+                    TPWrite "Block color out of spec. color detected: " + color;
+                ENDIF
+            ENDFOR
+        ENDFOR
+        
+        TPWrite "valid blocks: " + NumToStr(validated, 0);
+    ENDPROC
+    
+    
+    PROC colorMap(num value, INOUT string color)
+        IF value = 1 THEN
+            color := "Rood";
+        ELSEIF value = 2 THEN
+            color := "Grijs";
+        ELSEIF value = 3 THEN
+            color := "Blauw";
+        ELSE
+            color := "Zwart";
+        ENDIF
+    ENDPROC
     
     PROC waitOnSetup()
         TPWrite "Setup blocks and enable switch to continue";
@@ -36,10 +116,10 @@ MODULE MainModule
     
     PROC grab(num x, num y)
         ! Move above block
-        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), v100, z50, t_zuignap;
+        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), speed, z50, t_zuignap;
         
         ! Move down
-        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, -9.5), v100, z50, t_zuignap;
+        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_high), fineSpeed, z50, t_zuignap;
         
         ! Attempt to grab
         SetDO DO_Ventiel_Vacuüm,1;
@@ -51,7 +131,7 @@ MODULE MainModule
             
             ! turn off suction move down and attempt grab again
             SetDO DO_Ventiel_Vacuüm,0;
-            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, -13.5), v100, z50, t_zuignap;
+            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_low), fineSpeed, z50, t_zuignap;
             SetDO DO_Ventiel_Vacuüm,1;
             WaitTime 2;
         ELSE
@@ -63,15 +143,20 @@ MODULE MainModule
             blockExists{x,y} := 1;
             
             ! move up to clear other blocks
-            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 70), v100, z50, t_zuignap;
+            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 70), fineSpeed, z50, t_zuignap;
             
             measure_color x, y;
             
             ! move block back to original position in the grid
-            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 60), v100, z50, t_zuignap;
+            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 60), speed, z50, t_zuignap;
             
             ! move down
-            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, -9.5), v100, z50, t_zuignap;
+            IF blockHeight{x, y} = 54 THEN
+                MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_high), fineSpeed, z50, t_zuignap;
+            ELSE
+                MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_low), fineSpeed, z50, t_zuignap;
+            ENDIF
+            
             ! wait for movement to stop
             WaitTime 2;
             
@@ -85,12 +170,12 @@ MODULE MainModule
         ENDIF
         
         ! move back up
-        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), v100, z50, t_zuignap;
+        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), speed, z50, t_zuignap;
     ENDPROC
     
     PROC measure_color(num x, num y)
         ! move to sensor
-        MoveJ Offs(r_Kleurmeetpunt, 0, -70, 0), v100, z50, t_zuignap;
+        MoveJ Offs(r_Kleurmeetpunt, 0, -70, 0), speed, z50, t_zuignap;
         WaitTime 3;
         
         ! read color sensor
