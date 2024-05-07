@@ -12,19 +12,19 @@ MODULE MainModule
     CONST num offset_z_50 := -14; ! 50mm block
     
     ! collected data during run
-    PERS num blockColor{4,3}:=[[0,0,0], [0,0,0], [0,0,0], [0,0,0]];
-    PERS num blockHeight{4,3}:=[[58,0,0], [0,0,0], [0,0,0], [0,0,0]];
-    PERS num blockExists{4,3}:=[[1,0,0], [0,0,0], [0,0,0], [0,0,0]];
+    PERS num blockColor{4,3}:=[[0,2,0], [0,4,1], [3,1,0], [1,0,3]];
+    PERS num blockHeight{4,3}:=[[58,50,0], [0,54,54], [54,54,0], [50,0,54]];
+    PERS num blockExists{4,3}:=[[1,1,0], [0,1,1], [1,1,0], [1,0,1]];
     
     ! data calculated at end
-    PERS num validated := 0;
-    PERS num rejected := 0;
+    PERS num validated := 8;
+    PERS num rejected := 4;
     
-    PERS num grayCount := 0;
+    PERS num grayCount := 1;
     PERS num blueCount := 0;
     
-    PERS num largeCount := 0;
-    PERS num smallCount := 0;
+    PERS num largeCount := 6;
+    PERS num smallCount := 2;
     
     
     VAR string color;
@@ -150,7 +150,6 @@ MODULE MainModule
         IF DI_ManoMeter_Out1 = 1 THEN
             blockExists{x,y} := 1;
             blockHeight{x,y} := 54;
-            measure_color x, y;
             measure_color x, y, offset_z_54;
             
             ! turn off suction
@@ -169,7 +168,6 @@ MODULE MainModule
         IF DI_ManoMeter_Out1 = 1 THEN
             blockExists{x,y} := 1;
             blockHeight{x,y} := 50;
-            measure_color x, y;
             measure_color x, y, offset_z_50;
             
             ! turn off suction
