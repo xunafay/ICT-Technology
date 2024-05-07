@@ -1,23 +1,26 @@
 MODULE MainModule
 	CONST robtarget startPos:=[[378.22,-64.84,103.93],[0.000155952,1,0.000207079,-0.00039833],[-1,-1,0,1],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+    CONST robtarget r_Kleurmeetpunt:=[[261.01,367.86,154.36],[0.000158003,1,5.62801E-05,0.000424798],[0,0,-1,1],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
+
     CONST num offset_x := 70;
     CONST num offset_y := 65;
     
-    CONST num offset_z_high := -10;
-    CONST num offset_z_low := -14;
+    CONST num offset_z_58 := -6;
+    CONST num offset_z_54 := -10;
+    CONST num offset_z_50 := -14;
     
-    PERS num blockColor{4,3}:=[[4,4,0], [4,0,4], [0,4,0], [4,0,4]];
-    PERS num blockHeight{4,3}:=[[50,54,0], [50,0,50], [0,54,0], [54,0,54]];
-    PERS num blockExists{4,3}:=[[1,1,0], [1,0,1], [0,1,0], [1,0,1]];
+    PERS num blockColor{4,3}:=[[0,0,0], [0,0,0], [0,0,0], [0,0,0]];
+    PERS num blockHeight{4,3}:=[[58,0,0], [0,0,0], [0,0,0], [0,0,0]];
+    PERS num blockExists{4,3}:=[[1,0,0], [0,0,0], [0,0,0], [0,0,0]];
     
-    PERS num validated := 7;
-    PERS num rejected := 5;
+    PERS num validated := 0;
+    PERS num rejected := 0;
     
     PERS num grayCount := 0;
     PERS num blueCount := 0;
     
-    PERS num largeCount := 4;
-    PERS num smallCount := 3;
+    PERS num largeCount := 0;
+    PERS num smallCount := 0;
     
     
     VAR string color;
@@ -95,9 +98,9 @@ MODULE MainModule
         IF value = 1 THEN
             color := "Rood";
         ELSEIF value = 2 THEN
-            color := "Grijs";
-        ELSEIF value = 3 THEN
             color := "Blauw";
+        ELSEIF value = 3 THEN
+            color := "Grijs";
         ELSE
             color := "Zwart";
         ENDIF
@@ -119,11 +122,23 @@ MODULE MainModule
         MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), speed, z50, t_zuignap;
         
         ! Move down
-        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_high), fineSpeed, z50, t_zuignap;
+        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_58), fineSpeed, z50, t_zuignap;
         
         ! Attempt to grab
         SetDO DO_Ventiel_Vacuüm,1;
         WaitTime 2;
+        
+        IF DI_ManoMeter_Out1=1 THEN
+            blockHeight{x,y} := 58;
+            blockExists{x,y} := 1;
+            SetDO DO_Ventiel_Vacuüm,0;
+            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), speed, z50, t_zuignap;
+            RETURN;
+        ELSEIF DI_ManoMeter_Out1=0 THEN
+            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_54), fineSpeed, z50, t_zuignap;
+            SetDO DO_Ventiel_Vacuüm,1;
+            WaitTime 2;
+        ENDIF
         
         ! If no suction
         IF DI_ManoMeter_Out1 = 0 THEN
@@ -131,12 +146,13 @@ MODULE MainModule
             
             ! turn off suction move down and attempt grab again
             SetDO DO_Ventiel_Vacuüm,0;
-            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_low), fineSpeed, z50, t_zuignap;
+            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_50), fineSpeed, z50, t_zuignap;
             SetDO DO_Ventiel_Vacuüm,1;
             WaitTime 2;
         ELSE
             ! grabbed succesfully
-            blockHeight{x,y} := 54;           
+            blockHeight{x,y} := 54;
+            blockExists{x,y} := 1;
         ENDIF
         
         IF DI_ManoMeter_Out1 = 1 THEN
@@ -152,9 +168,9 @@ MODULE MainModule
             
             ! move down
             IF blockHeight{x, y} = 54 THEN
-                MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_high), fineSpeed, z50, t_zuignap;
+                MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_54), fineSpeed, z50, t_zuignap;
             ELSE
-                MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_low), fineSpeed, z50, t_zuignap;
+                MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_50), fineSpeed, z50, t_zuignap;
             ENDIF
             
             ! wait for movement to stop
@@ -162,7 +178,6 @@ MODULE MainModule
             
             ! turn off suction
             SetDO DO_Ventiel_Vacuüm,0;
-            
         ELSE
             ! no block grabbed
             blockHeight{x,y} := 0;
@@ -175,7 +190,7 @@ MODULE MainModule
     
     PROC measure_color(num x, num y)
         ! move to sensor
-        MoveJ Offs(r_Kleurmeetpunt, 0, -70, 0), speed, z50, t_zuignap;
+        MoveJ Offs(r_Kleurmeetpunt, 0, 0, 0), speed, z50, t_zuignap;
         WaitTime 3;
         
         ! read color sensor
@@ -184,10 +199,10 @@ MODULE MainModule
             TPWrite "Rood"; ! Rood
         ELSEIF DI_Kleur_Sensor_Q2 = 1 THEN
             blockColor{x,y} := 2;
-            TPWrite "Grijs"; ! Grijs
+            TPWrite "Blauw"; ! Grijs
         ELSEIF DI_Kleur_Sensor_Q3 = 1 THEN
             blockColor{x,y} := 3;
-            TPWrite "Blauw"; ! Blauw
+            TPWrite "Grijs"; ! Blauw
         ELSE
             blockColor{x,y} := 4;
             TPWrite "Zwart"; ! 
