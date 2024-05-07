@@ -2,17 +2,21 @@ MODULE MainModule
 	CONST robtarget startPos:=[[378.22,-64.84,103.93],[0.000155952,1,0.000207079,-0.00039833],[-1,-1,0,1],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
     CONST robtarget r_Kleurmeetpunt:=[[261.01,367.86,154.36],[0.000158003,1,5.62801E-05,0.000424798],[0,0,-1,1],[9E+09,9E+09,9E+09,9E+09,9E+09,9E+09]];
 
+    ! grid spacing
     CONST num offset_x := 70;
     CONST num offset_y := 65;
     
-    CONST num offset_z_58 := -6;
-    CONST num offset_z_54 := -10;
-    CONST num offset_z_50 := -14;
+    ! block heights to validate
+    CONST num offset_z_58 := -6; ! 58mm block
+    CONST num offset_z_54 := -10; ! 54mm block
+    CONST num offset_z_50 := -14; ! 50mm block
     
+    ! collected data during run
     PERS num blockColor{4,3}:=[[0,0,0], [0,0,0], [0,0,0], [0,0,0]];
     PERS num blockHeight{4,3}:=[[58,0,0], [0,0,0], [0,0,0], [0,0,0]];
     PERS num blockExists{4,3}:=[[1,0,0], [0,0,0], [0,0,0], [0,0,0]];
     
+    ! data calculated at end
     PERS num validated := 0;
     PERS num rejected := 0;
     
@@ -24,14 +28,12 @@ MODULE MainModule
     
     
     VAR string color;
-    CONST speeddata speed := v200;
-    CONST speeddata fineSpeed := v50;
     
-    ! 378 -64 103
-    ! 449 -0.6
+    CONST speeddata speed := v200; ! standard travel speed
+    CONST speeddata fineSpeed := v50; ! travel speed for delicate moves
     
 	PROC main()
-        reset_variables;
+        reset_variables; ! reset persistent variables
 		waitOnSetup;
         startProgram;
         FOR x FROM 1 TO 4 DO
@@ -57,6 +59,7 @@ MODULE MainModule
         blockExists := [[0,0,0], [0,0,0], [0,0,0], [0,0,0]];
     ENDPROC
     
+    ! validated corrected data with requirements
     PROC validate()
         FOR x FROM 1 TO 4 DO
             FOR y FROM 1 TO 3 DO
@@ -93,7 +96,7 @@ MODULE MainModule
         TPWrite "valid blocks: " + NumToStr(validated, 0);
     ENDPROC
     
-    
+    ! map color number to string representation
     PROC colorMap(num value, INOUT string color)
         IF value = 1 THEN
             color := "Rood";
@@ -105,7 +108,7 @@ MODULE MainModule
             color := "Zwart";
         ENDIF
     ENDPROC
-    
+
     PROC waitOnSetup()
         TPWrite "Setup blocks and enable switch to continue";
         WaitUntil(DI10_9_SW0 = 1);
@@ -120,75 +123,75 @@ MODULE MainModule
     PROC grab(num x, num y)
         ! Move above block
         MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), speed, z50, t_zuignap;
-        
-        ! Move down
+
+        ! Move down to 58mm block
         MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_58), fineSpeed, z50, t_zuignap;
         
         ! Attempt to grab
         SetDO DO_Ventiel_Vacuüm,1;
         WaitTime 2;
         
+        
         IF DI_ManoMeter_Out1=1 THEN
+            ! successfully grabbed, register block
             blockHeight{x,y} := 58;
             blockExists{x,y} := 1;
-            SetDO DO_Ventiel_Vacuüm,0;
+            SetDO DO_Ventiel_Vacuüm,0; ! turn of vacuum
+            ! move back up to clear block
             MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), speed, z50, t_zuignap;
-            RETURN;
-        ELSEIF DI_ManoMeter_Out1=0 THEN
-            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_54), fineSpeed, z50, t_zuignap;
-            SetDO DO_Ventiel_Vacuüm,1;
-            WaitTime 2;
+            RETURN; ! end and continue with next block
         ENDIF
-        
-        ! If no suction
-        IF DI_ManoMeter_Out1 = 0 THEN
-            blockHeight{x,y} := 50;
-            
-            ! turn off suction move down and attempt grab again
-            SetDO DO_Ventiel_Vacuüm,0;
-            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_50), fineSpeed, z50, t_zuignap;
-            SetDO DO_Ventiel_Vacuüm,1;
-            WaitTime 2;
-        ELSE
-            ! grabbed succesfully
-            blockHeight{x,y} := 54;
-            blockExists{x,y} := 1;
-        ENDIF
+
+        ! failed to grab, move down to 54mm block height and turn on vacuum
+        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_54), fineSpeed, z50, t_zuignap;
+        SetDO DO_Ventiel_Vacuüm,1;
+        WaitTime 2;
         
         IF DI_ManoMeter_Out1 = 1 THEN
             blockExists{x,y} := 1;
-            
-            ! move up to clear other blocks
-            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 70), fineSpeed, z50, t_zuignap;
-            
+            blockHeight{x,y} := 54;
             measure_color x, y;
-            
-            ! move block back to original position in the grid
-            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 60), speed, z50, t_zuignap;
-            
-            ! move down
-            IF blockHeight{x, y} = 54 THEN
-                MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_54), fineSpeed, z50, t_zuignap;
-            ELSE
-                MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_50), fineSpeed, z50, t_zuignap;
-            ENDIF
-            
-            ! wait for movement to stop
-            WaitTime 2;
+            measure_color x, y, offset_z_54;
             
             ! turn off suction
             SetDO DO_Ventiel_Vacuüm,0;
-        ELSE
-            ! no block grabbed
-            blockHeight{x,y} := 0;
-            blockExists{x,y} := 0;
+            
+            ! move back up
+            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), speed, z50, t_zuignap;
+            RETURN; ! end and continue to next block
         ENDIF
+        
+        ! failed to grab, move down to 54mm block height and turn on vacuum
+        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset_z_50), fineSpeed, z50, t_zuignap;
+        SetDO DO_Ventiel_Vacuüm,1;
+        WaitTime 2;
+        
+        IF DI_ManoMeter_Out1 = 1 THEN
+            blockExists{x,y} := 1;
+            blockHeight{x,y} := 50;
+            measure_color x, y;
+            measure_color x, y, offset_z_50;
+            
+            ! turn off suction
+            SetDO DO_Ventiel_Vacuüm,0;
+            
+            ! move back up
+            MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), speed, z50, t_zuignap;
+            RETURN; ! end and continue to next block
+        ENDIF
+        
+        ! no blocks grabbed
+        blockHeight{x,y} := 0;
+        blockExists{x,y} := 0;
         
         ! move back up
         MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 0), speed, z50, t_zuignap;
     ENDPROC
     
-    PROC measure_color(num x, num y)
+    PROC measure_color(num x, num y, num offset)
+        ! move up to clear other blocks
+        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 70), fineSpeed, z50, t_zuignap;
+        
         ! move to sensor
         MoveJ Offs(r_Kleurmeetpunt, 0, 0, 0), speed, z50, t_zuignap;
         WaitTime 3;
@@ -207,5 +210,14 @@ MODULE MainModule
             blockColor{x,y} := 4;
             TPWrite "Zwart"; ! 
         ENDIF
+        
+        ! move block back to original position in the grid
+        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, 70), speed, z50, t_zuignap;
+        
+        ! move back down to original position
+        MoveJ Offs(startPos, (x-1)*offset_x, (y-1)*offset_y, offset), speed, z50, t_zuignap;
+        
+        ! wait for movement to stop
+        WaitTime 2;
     ENDPROC
 ENDMODULE
